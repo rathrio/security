@@ -35,12 +35,26 @@ class String
   end
 end
 
-options = {}
+usage = <<EOS
+Usage:
+
+    Index a directory with
+
+        ./integ --index DIR
+
+    Subsequently, you can check the directory's state with
+
+        ./integ DIR
+
+
+EOS
+
+$options = {}
 option_parser = OptionParser.new do |opts|
-  opts.banner = "Usage: ./integ path/to/some/directory\n\n"
+  opts.banner = usage
 
   opts.on('-i', '--index', "Update #{INDEX_FILE}") do
-    options[:index] = true
+    $options[:index] = true
   end
 
   opts.on('-c', '--clean', "Remove #{INDEX_FILE}") do
@@ -55,7 +69,7 @@ option_parser = OptionParser.new do |opts|
   end
 
   opts.on('--no-color', 'Disable colored output') do
-    options[:no_color] = true
+    $options[:no_color] = true
   end
 
   opts.on_tail('-h', '--help', 'Show this message') do
@@ -63,9 +77,22 @@ option_parser = OptionParser.new do |opts|
     exit
   end
 end
-option_parser.parse!
 
-$use_color = false if options[:no_color]
+HELP = option_parser.help
+
+begin
+  option_parser.parse!
+rescue => e
+  puts HELP
+  exit
+end
+
+if ARGV.empty?
+  puts HELP
+  exit
+end
+
+$use_color = false if $options[:no_color]
 
 def files(dir)
   Dir["#{dir}/**/*"].reject { |path| File.directory? path }
@@ -93,17 +120,23 @@ class Index
     @checksums ||= JSON.parse(File.read(INDEX_FILE))[dir]
   end
 
-  def write_checksums(checksums)
-    File.open(INDEX_FILE, 'w') do |f|
-      f.truncate 0
-      f.write checksums.to_json
-    end
+  def exists?
+    File.exists? INDEX_FILE
   end
 
   def status(file)
     checksum_in_index = checksums[file]
     return :added if checksum_in_index.nil?
     (checksum_in_index == checksum(file)) ? :unchanged : :modified
+  end
+
+  private
+
+  def write_checksums(checksums)
+    File.open(INDEX_FILE, 'w') do |f|
+      f.truncate 0
+      f.write checksums.to_json
+    end
   end
 end
 
@@ -112,12 +145,23 @@ def index(dir)
   index.index!
 end
 
+def print_index_prompt
+  puts "Please index the directory first with --index.\n\n"
+  puts HELP
+end
+
 def analyse(dir)
   index = Index.new(dir)
-  checksums = index.checksums
 
+  unless index.exists?
+    print_index_prompt
+    exit
+  end
+
+  checksums = index.checksums
   if checksums.nil?
-    raise "NOOO index"
+    print_index_prompt
+    exit
   end
 
   files = files(dir)
@@ -147,20 +191,14 @@ def analyse(dir)
   end
 end
 
-if ARGV.empty?
-  puts option_parser.help
-  exit
-end
-
-dir = ARGV.shift
-dir = File.absolute_path dir
+dir = File.absolute_path ARGV.shift
 
 unless File.directory? dir
   puts "The directory #{dir} does not exist"
   exit
 end
 
-if options[:index]
+if $options[:index]
   index dir
   exit
 end
