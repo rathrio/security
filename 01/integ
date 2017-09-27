@@ -8,12 +8,18 @@ require 'json'
 EXECUTABLE = File.realpath(__FILE__)
 THIS_DIR = File.dirname EXECUTABLE
 INDEX_FILE = "#{THIS_DIR}/integ.json"
-
 TICK = '✓'
+
+$use_color = true
 
 class String
   def colorize(code)
+    return self unless $use_color
     "\e[#{code}m#{self}\e[0m"
+  end
+
+  def red
+    colorize(31)
   end
 
   def green
@@ -22,6 +28,10 @@ class String
 
   def yellow
     colorize(33)
+  end
+
+  def cyan
+    colorize(96)
   end
 end
 
@@ -44,12 +54,18 @@ option_parser = OptionParser.new do |opts|
     exit
   end
 
+  opts.on('--no-color', 'Disable colored output') do
+    options[:no_color] == true
+  end
+
   opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
   end
 end
 option_parser.parse!
+
+$use_color = false if options[:no_color]
 
 def files(dir)
   Dir["#{dir}/**/*"].reject { |path| File.directory? path }
@@ -73,8 +89,8 @@ class Index
     puts "Wrote checksums to #{INDEX_FILE}."
   end
 
-  def read_checksums
-    JSON.parse File.read(INDEX_FILE)
+  def checksums
+    @checksums ||= JSON.parse(File.read(INDEX_FILE))[dir]
   end
 
   def write_checksums(checksums)
@@ -82,6 +98,12 @@ class Index
       f.truncate 0
       f.write checksums.to_json
     end
+  end
+
+  def status(file)
+    checksum_in_index = checksums[file]
+    return :added if checksum_in_index.nil?
+    (checksum_in_index == checksum(file)) ? :unchanged : :modified
   end
 end
 
@@ -92,21 +114,36 @@ end
 
 def analyse(dir)
   index = Index.new(dir)
-  checksums = index.read_checksums
+  checksums = index.checksums
 
-  if (checksums = checksums[dir]).nil?
+  if checksums.nil?
     raise "NOOO index"
   end
 
-  files(dir).each do |file|
+  files = files(dir)
+
+  # Check for modifications and additions.
+  files.each do |file|
     print "#{file} "
 
-    # TODO ask the index instance about the status of this file
-    if checksum(file) == checksums[file]
+    status = index.status(file)
+
+    case index.status(file)
+    when :unchanged
       puts TICK.green
-    else
+    when :modified
       puts 'MODIFIED'.yellow
+    when :added
+      puts 'ADDED'.cyan
+    else
+      raise 'Unknown file status'
     end
+  end
+
+  # Print deleted files.
+  (checksums.keys - files).each do |file|
+    print "#{file} "
+    puts 'DELETED'.red
   end
 end
 
