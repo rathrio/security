@@ -55,7 +55,7 @@ option_parser = OptionParser.new do |opts|
   end
 
   opts.on('--no-color', 'Disable colored output') do
-    options[:no_color] == true
+    options[:no_color] = true
   end
 
   opts.on_tail('-h', '--help', 'Show this message') do
@@ -154,6 +154,11 @@ end
 
 dir = ARGV.shift
 dir = File.absolute_path dir
+
+unless File.directory? dir
+  puts "The directory #{dir} does not exist"
+  exit
+end
 
 if options[:index]
   index dir
