@@ -1,0 +1,126 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'fileutils'
+require 'digest'
+require 'json'
+
+EXECUTABLE = File.realpath(__FILE__)
+THIS_DIR = File.dirname EXECUTABLE
+INDEX_FILE = "#{THIS_DIR}/integ.json"
+
+TICK = '✓'
+
+class String
+  def colorize(code)
+    "\e[#{code}m#{self}\e[0m"
+  end
+
+  def green
+    colorize(32)
+  end
+
+  def yellow
+    colorize(33)
+  end
+end
+
+options = {}
+option_parser = OptionParser.new do |opts|
+  opts.banner = "Usage: ./integ path/to/some/directory\n\n"
+
+  opts.on('-i', '--index', "Update #{INDEX_FILE}") do
+    options[:index] = true
+  end
+
+  opts.on('-c', '--clean', "Remove #{INDEX_FILE}") do
+    if File.exists? INDEX_FILE
+      FileUtils.rm INDEX_FILE
+      puts "Removed #{INDEX_FILE}."
+    else
+      puts "#{INDEX_FILE} does not exist."
+    end
+
+    exit
+  end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+option_parser.parse!
+
+def files(dir)
+  Dir["#{dir}/**/*"].reject { |path| File.directory? path }
+end
+
+def checksum(file)
+  Digest::SHA2.file(file).hexdigest
+end
+
+class Index
+  attr_reader :dir
+
+  def initialize(dir)
+    @dir = dir
+  end
+
+  def index!
+    checksums = {}
+    checksums[dir] = Hash[files(dir).map { |f| [f, checksum(f)] }]
+    write_checksums(checksums)
+    puts "Wrote checksums to #{INDEX_FILE}."
+  end
+
+  def read_checksums
+    JSON.parse File.read(INDEX_FILE)
+  end
+
+  def write_checksums(checksums)
+    File.open(INDEX_FILE, 'w') do |f|
+      f.truncate 0
+      f.write checksums.to_json
+    end
+  end
+end
+
+def index(dir)
+  index = Index.new(dir)
+  index.index!
+end
+
+def analyse(dir)
+  index = Index.new(dir)
+  checksums = index.read_checksums
+
+  if (checksums = checksums[dir]).nil?
+    raise "NOOO index"
+  end
+
+  files(dir).each do |file|
+    print "#{file} "
+
+    # TODO ask the index instance about the status of this file
+    if checksum(file) == checksums[file]
+      puts TICK.green
+    else
+      puts 'MODIFIED'.yellow
+    end
+  end
+end
+
+if ARGV.empty?
+  puts option_parser.help
+  exit
+end
+
+dir = ARGV.shift
+dir = File.absolute_path dir
+
+if options[:index]
+  index dir
+  exit
+end
+
+analyse dir
