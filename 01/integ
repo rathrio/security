@@ -11,6 +11,7 @@ INDEX_FILE = "#{THIS_DIR}/integ.json"
 TICK = '✓'
 
 $use_color = true
+$ignore_paths = []
 
 class String
   def colorize(code)
@@ -72,6 +73,10 @@ option_parser = OptionParser.new do |opts|
     $options[:no_color] = true
   end
 
+  opts.on('--ignore [IGNORE_FILE]', 'Ignore files/folders') do |ignore_file|
+    $ignore_paths = File.readlines(ignore_file).map(&:strip)
+  end
+
   opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
@@ -94,8 +99,18 @@ end
 
 $use_color = false if $options[:no_color]
 
+def ignore?(path)
+  $ignore_paths.any? do |ipath|
+    if ipath.include? '/'
+      path.include?(ipath)
+    else
+      path.split('/').reject(&:empty?).any? { |e| e == ipath }
+    end
+  end
+end
+
 def files(dir)
-  Dir["#{dir}/**/*"].reject { |path| File.directory? path }
+  Dir["#{dir}/**/*"].reject { |path| ignore?(path) || File.directory?(path) }
 end
 
 def checksum(file)
@@ -117,7 +132,8 @@ class Index
   end
 
   def checksums
-    @checksums ||= JSON.parse(File.read(INDEX_FILE))[dir]
+    @checksums ||= JSON.parse(File.read(INDEX_FILE))[dir].
+      reject { |path, _| ignore?(path) }
   end
 
   def exists?

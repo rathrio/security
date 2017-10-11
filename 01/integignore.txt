@@ -1,0 +1,3 @@
+ignoreme.txt
+foobar
+some/path
