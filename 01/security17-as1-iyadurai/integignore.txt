@@ -1,4 +1,0 @@
-ignoreme.txt
-foobar
-some/path
-integ.json
