@@ -25,6 +25,31 @@ def list_objects
   end
 end
 
+# Turns CLI args of object attributes into a Ruby Hash
+def parse_attributes(attributes)
+  Hash[
+    attributes.split(',').map do |attr|
+      key, value = attr.split('=')
+      key = key.to_sym
+      [key, value]
+    end
+  ]
+end
+
+def parse_op(op)
+  op, attr, value = op.split(',').map(&:strip)
+  op = op.to_sym
+
+  allowed_ops = %i(add replace delete)
+  unless allowed_ops.include?(op)
+    puts "Operation must be one of #{allowed_ops.join(', ')}"
+    exit
+  end
+
+  attr = attr.to_sym
+  [op, attr, value]
+end
+
 $options = {}
 option_parser = OptionParser.new do |opts|
   opts.on('-l', '--list', "List objects in students unit") do
@@ -33,13 +58,7 @@ option_parser = OptionParser.new do |opts|
   end
 
   opts.on('-a', '--add ATTRIBUTES', "Add an object to the students unit") do |attributes|
-    attributes = Hash[
-      attributes.split(',').map do |attr|
-        key, value = attr.split('=')
-        key = key.to_sym
-        [key, value]
-      end
-    ]
+    attributes = parse_attributes(attributes)
 
     defaults = {
       objectclass: [OBJECT_CLASS]
@@ -56,6 +75,16 @@ option_parser = OptionParser.new do |opts|
 
   opts.on('-r', '--remove DN', "Remove the object with the DN from the students unit") do |dn|
     $ldap.delete dn: dn
+
+    list_objects
+    exit
+  end
+
+  opts.on('-m', '--modify DN OP1 [OP2, OP3, ...]', 'Modify an object') do |dn|
+    operations = ARGV.map { |arg| parse_op arg }
+
+    $ldap.modify dn: dn, operations: operations
+
     list_objects
     exit
   end
@@ -73,12 +102,7 @@ end
 
 HELP = option_parser.help
 
-# begin
-  option_parser.parse!
-# rescue => e
-#   puts HELP
-#   exit
-# end
+option_parser.parse!
 
 if ARGV.empty?
   puts HELP
