@@ -10,11 +10,12 @@ server = TCPServer.open PORT
 $n, $e, $d = RSA.generate_keys BITS
 
 def decrypt(message)
-  RSA.decrypt(message, $n, $d)
+  RSA.decrypt(message.chomp.to_i, $n, $d)
 end
 
 loop do
-  Thread.start(server.accept) do |socket|
+  # Thread.start(server.accept) do |socket|
+    socket = server.accept
     puts "RSA client has connected."
 
     socket.puts($n)
@@ -26,5 +27,5 @@ loop do
     end
 
     socket.close
-  end
+  # end
 end

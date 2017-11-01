@@ -49,9 +49,9 @@ module RSA
 
   def as_string(number)
     s = ""
-    while (n > 0)
-      s = (n & 0xFF).chr + s
-      n >>= 8
+    while (number > 0)
+      s = (number & 0xFF).chr + s
+      number >>= 8
     end
     s
   end

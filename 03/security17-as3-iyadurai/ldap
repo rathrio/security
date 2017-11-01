@@ -1,0 +1,111 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'net/ldap'
+
+TREE_BASE = 'ou=students,dc=security,dc=ch'.freeze
+OBJECT_CLASS = 'person'.freeze
+
+$ldap = Net::LDAP.new(
+  host: 'clusterinfo.unineuchatel.ch',
+  port: '10389',
+  base: TREE_BASE,
+  auth: {
+    method: :simple,
+    username: 'cn=admin,dc=security,dc=ch',
+    password: 'security2017'
+  }
+)
+
+# Print all entries in the organisational unit (ou) "students" in LDIF format.
+def list_objects
+  $ldap.search(return_result: false) do |entry|
+    puts entry.to_ldif
+    puts
+  end
+end
+
+# Turns CLI args of object attributes into a Ruby Hash
+def parse_attributes(attributes)
+  Hash[
+    attributes.split(',').map do |attr|
+      key, value = attr.split('=')
+      key = key.to_sym
+      [key, value]
+    end
+  ]
+end
+
+def parse_op(op)
+  op, attr, value = op.split(',').map(&:strip)
+  op = op.to_sym
+
+  allowed_ops = %i(add replace delete)
+  unless allowed_ops.include?(op)
+    puts "Operation must be one of #{allowed_ops.join(', ')}"
+    exit
+  end
+
+  attr = attr.to_sym
+  [op, attr, value]
+end
+
+$options = {}
+option_parser = OptionParser.new do |opts|
+  opts.on('-l', '--list', "List objects in students unit") do
+    list_objects
+    exit
+  end
+
+  opts.on('-a', '--add ATTRIBUTES', "Add an object to the students unit") do |attributes|
+    attributes = parse_attributes(attributes)
+
+    defaults = {
+      objectclass: [OBJECT_CLASS]
+    }
+
+    attributes.merge!(defaults)
+
+    dn = "cn=#{attributes.fetch(:cn)},#{TREE_BASE}"
+    $ldap.add(dn: dn, attributes: attributes)
+
+    list_objects
+    exit
+  end
+
+  opts.on('-r', '--remove DN', "Remove the object with the DN from the students unit") do |dn|
+    $ldap.delete dn: dn
+
+    list_objects
+    exit
+  end
+
+  opts.on('-m', '--modify DN OP1 [OP2, OP3, ...]', 'Modify an object') do |dn|
+    operations = ARGV.map { |arg| parse_op arg }
+
+    $ldap.modify dn: dn, operations: operations
+
+    list_objects
+    exit
+  end
+
+  opts.on('--repl') do
+    require 'pry'; binding.pry
+    exit
+  end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+HELP = option_parser.help
+
+option_parser.parse!
+
+if ARGV.empty?
+  puts HELP
+  exit
+end
+

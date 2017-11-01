@@ -15,7 +15,7 @@ puts "Received public modulus n=#{$n}"
 
 def encrypt(message)
   raise "Don't know the public key" if $n.nil?
-  RSA.encrypt(message, $n)
+  RSA.encrypt(message.chomp, $n)
 end
 
 loop do
@@ -27,7 +27,7 @@ loop do
       puts "Received message: #{message}"
 
       cypher = encrypt(message)
-      rsa_server.print(cypher)
+      rsa_server.puts(cypher)
       puts "Sent encrypted message: #{cypher}"
     end
 
