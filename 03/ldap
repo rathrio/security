@@ -1,0 +1,81 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'net/ldap'
+
+TREE_BASE = 'ou=students,dc=security,dc=ch'.freeze
+OBJECT_CLASS = 'person'.freeze
+
+$ldap = Net::LDAP.new(
+  host: 'clusterinfo.unineuchatel.ch',
+  port: '10389',
+  base: TREE_BASE,
+  auth: {
+    method: :simple,
+    username: 'cn=admin,dc=security,dc=ch',
+    password: 'security2017'
+  }
+)
+
+# Print all entries in the organisational unit (ou) "students" in LDIF format.
+def list_objects
+  $ldap.search(return_result: false) do |entry|
+    puts entry.to_ldif
+    puts
+  end
+end
+
+$options = {}
+option_parser = OptionParser.new do |opts|
+  opts.on('-l', '--list', "List objects in students unit") do
+    list_objects
+    exit
+  end
+
+  opts.on('-a', '--add ATTRIBUTES', "Add an object to the students unit") do |attributes|
+    attributes = Hash[
+      attributes.split(',').map do |attr|
+        key, value = attr.split('=')
+        key = key.to_sym
+        [key, value]
+      end
+    ]
+
+    defaults = {
+      objectclass: [OBJECT_CLASS]
+    }
+
+    attributes.merge!(defaults)
+
+    dn = "cn=#{attributes.fetch(:cn)},#{TREE_BASE}"
+    $ldap.add(dn: dn, attributes: attributes)
+
+    list_objects
+    exit
+  end
+
+  opts.on('--repl') do
+    require 'pry'; binding.pry
+    exit
+  end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+HELP = option_parser.help
+
+# begin
+  option_parser.parse!
+# rescue => e
+#   puts HELP
+#   exit
+# end
+
+if ARGV.empty?
+  puts HELP
+  exit
+end
+
