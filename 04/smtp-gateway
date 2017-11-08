@@ -3,12 +3,34 @@
 require 'gserver'
 require 'mini-smtp-server'
 require 'mail'
+require 'optparse'
 
-RELAY_HOST = 'localhost'
-RELAY_PORT = 1025
+$options = {}
+option_parser = OptionParser.new do |opts|
+  opts.on('--host HOST:PORT') do |host|
+    $options[:host], $options[:port] = host.strip.split(':')
+  end
 
-GATEWAY_HOST = 'localhost'
-GATEWAY_PORT = 2525
+  opts.on('--relay HOST:PORT') do |host|
+    $options[:replay_host], $options[:replay_port] = host.strip.split(':')
+  end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+option_parser.parse!
+
+
+KEYWORDS = ARGF.readlines.map(&:chomp)
+
+RELAY_HOST = $options[:replay_host] || 'localhost'
+RELAY_PORT = $options[:replay_port] || 1025
+
+GATEWAY_HOST = $options[:host] || 'localhost'
+GATEWAY_PORT = $options[:port] || 2525
 
 Mail.defaults do
   delivery_method :smtp, address: RELAY_HOST, port: RELAY_PORT
@@ -44,7 +66,7 @@ class SMTPGateway < MiniSmtpServer
   def new_message_event(message_hash)
     mail = Mail.read_from_string(message_hash.fetch(:data))
 
-    filter = KeywordFilter.new
+    filter = KeywordFilter.new KEYWORDS
     filter.apply!(mail)
 
     mail.deliver
@@ -59,7 +81,9 @@ msg = <<~EOS
   SMTP Gateway 9000
   =================
 
-  smtp://#{GATEWAY_HOST}:#{GATEWAY_PORT} --> smtp://#{RELAY_HOST}:#{RELAY_PORT}
+  Listening: smtp://#{GATEWAY_HOST}:#{GATEWAY_PORT}
+  Relay: smtp://#{RELAY_HOST}:#{RELAY_PORT}
+  Keywords: #{KEYWORDS.count}
 
 EOS
 puts msg
