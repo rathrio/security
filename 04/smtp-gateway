@@ -6,7 +6,18 @@ require 'mail'
 require 'optparse'
 
 $options = {}
+
+usage = <<EOS
+Usage: ./smtp-gateway [options] kw_file1 [kw_file2 ...]
+
+    Example
+        ./smtp-gateway filter.txt --host localhost:1234
+
+EOS
+
 option_parser = OptionParser.new do |opts|
+  opts.banner = usage
+
   opts.on('--host HOST:PORT') do |host|
     $options[:host], $options[:port] = host.strip.split(':')
   end
@@ -21,10 +32,15 @@ option_parser = OptionParser.new do |opts|
   end
 end
 
+HELP = option_parser.help
 option_parser.parse!
 
+if ARGV.empty?
+  puts HELP
+  exit
+end
 
-KEYWORDS = ARGF.readlines.map(&:chomp)
+KEYWORDS = ARGF.readlines.map(&:chomp).reject(&:empty?)
 
 RELAY_HOST = $options[:replay_host] || 'localhost'
 RELAY_PORT = $options[:replay_port] || 1025
@@ -55,7 +71,7 @@ class KeywordFilter
     str = str.to_s.clone
 
     keywords.each do |kw|
-      str.gsub!(kw, replace)
+      str.gsub!(Regexp.new(kw), replace)
     end
 
     str

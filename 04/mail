@@ -39,7 +39,7 @@ end
 from    = $options[:from] || 'spongebob@bikini.org'
 to      = $options[:to] || 'patrick@star.com'
 subject = $options[:subject] || 'super secret stuff'
-body    = $options[:body] || 'hey patrick, you wanna hang out and do some super secret stuff?'
+body    = $options[:body] || 'hey patrick, you wanna hang out and do some super secret stuff and exchange secrets?'
 
 mail = Mail.new do
   from    from
