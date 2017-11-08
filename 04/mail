@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+
+require 'mail'
+require 'optparse'
+
+$options = {}
+option_parser = OptionParser.new do |opts|
+  opts.on('-f', '--from FROM') do |from|
+    $options[:from] = from.strip
+  end
+
+  opts.on('-t', '--to TO') do |to|
+    $options[:to] = to.strip
+  end
+
+  opts.on('-s', '--subject SUBJECT') do |subject|
+    $options[:subject] = subject.strip
+  end
+
+  opts.on('-b', '--body BODY') do |body|
+    $options[:body] = body.strip
+  end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+option_parser.parse!
+
+host = 'localhost'
+port = 2525
+
+Mail.defaults do
+  delivery_method :smtp, address: host, port: port
+end
+
+from    = $options[:from] || 'spongebob@bikini.org'
+to      = $options[:to] || 'patrick@star.com'
+subject = $options[:subject] || 'super secret stuff'
+body    = $options[:body] || 'hey patrick, you wanna hang out and do some super secret stuff?'
+
+mail = Mail.new do
+  from    from
+  to      to
+  subject subject
+  body    body
+end
+
+mail.deliver
+puts mail

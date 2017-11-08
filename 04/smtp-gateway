@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+
+require 'gserver'
+require 'mini-smtp-server'
+require 'mail'
+
+RELAY_HOST = 'localhost'
+RELAY_PORT = 1025
+
+GATEWAY_HOST = 'localhost'
+GATEWAY_PORT = 2525
+
+Mail.defaults do
+  delivery_method :smtp, address: RELAY_HOST, port: RELAY_PORT
+end
+
+class KeywordFilter
+  attr_reader :keywords, :replace
+
+  def initialize(keywords = [])
+    @keywords = keywords
+    @replace = '[redacted]'
+  end
+
+  def apply!(mail)
+    mail.subject redact(mail.subject)
+    mail.body    redact(mail.body)
+  end
+
+  private
+
+  def redact(str)
+    str = str.to_s.clone
+
+    keywords.each do |kw|
+      str.gsub!(kw, replace)
+    end
+
+    str
+  end
+end
+
+class SMTPGateway < MiniSmtpServer
+  def new_message_event(message_hash)
+    mail = Mail.read_from_string(message_hash.fetch(:data))
+
+    filter = KeywordFilter.new
+    filter.apply!(mail)
+
+    mail.deliver
+    puts mail
+  end
+end
+
+server = SMTPGateway.new(GATEWAY_PORT, GATEWAY_HOST)
+server.start
+
+msg = <<~EOS
+  SMTP Gateway 9000
+  =================
+
+  smtp://#{GATEWAY_HOST}:#{GATEWAY_PORT} --> smtp://#{RELAY_HOST}:#{RELAY_PORT}
+
+EOS
+puts msg
+
+server.join
