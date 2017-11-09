@@ -21,6 +21,10 @@ option_parser = OptionParser.new do |opts|
     $options[:body] = body.strip
   end
 
+  opts.on('-a', '--attach FILE') do |file|
+    $options[:files] = [file.strip]
+  end
+
   opts.on('--host HOST:PORT') do |host|
     $options[:host], $options[:port] = host.strip.split(':')
   end
@@ -50,6 +54,10 @@ mail = Mail.new do
   to      to
   subject subject
   body    body
+end
+
+$options[:files].each do |file|
+  mail.add_file(file)
 end
 
 mail.deliver

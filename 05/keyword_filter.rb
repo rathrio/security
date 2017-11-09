@@ -1,5 +1,5 @@
-# Keyword filter that currently just replaces the matched keywords with
-# "[redacted]".
+# Keyword filter that currently just replaces the matched
+# keywords with "[redacted]".
 class KeywordFilter
   attr_reader :keywords, :replace
 
@@ -8,8 +8,10 @@ class KeywordFilter
     @replace = '[redacted]'
   end
 
+  # Redacts the subject and body of the mail.
+  #
+  # @param mail [Mail::Message] mail to be redacted
   def apply!(mail)
-    raise
     mail.subject redact(mail.subject)
     mail.body    redact(mail.body)
   end

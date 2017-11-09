@@ -6,6 +6,7 @@ require 'mail'
 require 'optparse'
 
 require_relative './keyword_filter'
+require_relative './virus_scanner'
 
 # CLI
 
@@ -63,9 +64,13 @@ class SMTPGateway < MiniSmtpServer
     # Parse the received email.
     mail = Mail.read_from_string(message_hash.fetch(:data))
 
-    # Redact it.
+    # Redact keywords.
     filter = KeywordFilter.new KEYWORDS
     filter.apply!(mail)
+
+    # Remove viruses.
+    scanner = VirusScanner.new
+    scanner.apply!(mail)
 
     # Relay it.
     mail.deliver
