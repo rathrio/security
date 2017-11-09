@@ -23,7 +23,7 @@ option_parser = OptionParser.new do |opts|
   end
 
   opts.on('--relay HOST:PORT') do |host|
-    $options[:replay_host], $options[:replay_port] = host.strip.split(':')
+    $options[:relay_host], $options[:relay_port] = host.strip.split(':')
   end
 
   opts.on_tail('-h', '--help', 'Show this message') do
@@ -42,16 +42,19 @@ end
 
 KEYWORDS = ARGF.readlines.map(&:chomp).reject(&:empty?)
 
-RELAY_HOST = $options[:replay_host] || 'localhost'
-RELAY_PORT = $options[:replay_port] || 1025
-
 GATEWAY_HOST = $options[:host] || 'localhost'
 GATEWAY_PORT = $options[:port] || 2525
+
+# Defaults for mailcatcher
+RELAY_HOST = $options[:relay_host] || 'localhost'
+RELAY_PORT = $options[:relay_port] || 1025
 
 Mail.defaults do
   delivery_method :smtp, address: RELAY_HOST, port: RELAY_PORT
 end
 
+# Keyword filter that currently just replaces the matched keywords with
+# "[redacted]".
 class KeywordFilter
   attr_reader :keywords, :replace
 
@@ -61,6 +64,7 @@ class KeywordFilter
   end
 
   def apply!(mail)
+    puts mail.class
     mail.subject redact(mail.subject)
     mail.body    redact(mail.body)
   end
@@ -80,11 +84,14 @@ end
 
 class SMTPGateway < MiniSmtpServer
   def new_message_event(message_hash)
+    # Parse the received email.
     mail = Mail.read_from_string(message_hash.fetch(:data))
 
+    # Redact it.
     filter = KeywordFilter.new KEYWORDS
     filter.apply!(mail)
 
+    # Relay it.
     mail.deliver
     puts mail
   end
@@ -93,7 +100,7 @@ end
 server = SMTPGateway.new(GATEWAY_PORT, GATEWAY_HOST)
 server.start
 
-msg = <<~EOS
+header = <<~EOS
   SMTP Gateway 9000
   =================
 
@@ -102,6 +109,6 @@ msg = <<~EOS
   Keywords: #{KEYWORDS.count}
 
 EOS
-puts msg
+puts header
 
 server.join

@@ -21,6 +21,10 @@ option_parser = OptionParser.new do |opts|
     $options[:body] = body.strip
   end
 
+  opts.on('--host HOST:PORT') do |host|
+    $options[:host], $options[:port] = host.strip.split(':')
+  end
+
   opts.on_tail('-h', '--help', 'Show this message') do
     puts opts
     exit
@@ -29,8 +33,8 @@ end
 
 option_parser.parse!
 
-host = 'localhost'
-port = 2525
+host = $options[:host] || 'localhost'
+port = $options[:port] || 2525
 
 Mail.defaults do
   delivery_method :smtp, address: host, port: port
