@@ -25,6 +25,10 @@ option_parser = OptionParser.new do |opts|
     $options[:files] = [file.strip]
   end
 
+  opts.on('-v', '--virus', "Mail EICAR test string as body") do
+    $options[:body] = "X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+  end
+
   opts.on('--host HOST:PORT') do |host|
     $options[:host], $options[:port] = host.strip.split(':')
   end
@@ -56,7 +60,7 @@ mail = Mail.new do
   body    body
 end
 
-$options[:files].each do |file|
+($options[:files] || []).each do |file|
   mail.add_file(file)
 end
 
