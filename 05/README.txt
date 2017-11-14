@@ -33,10 +33,8 @@ Prerequisites
 
       gem install mail gserver mini-smtp-server mailcatcher clamav-client
 
-  I'm using a socket to communicate with the
-  clamd server. You might need to set the
-  following ENV var to let the client know
-  about the correct socket:
+  I'm using a socket to communicate with the clamd server. You might need to
+  set the following ENV var to let the client know about the correct socket:
 
       CLAMD_UNIX_SOCKET='/tmp/clamd.socket'
 
