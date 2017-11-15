@@ -12,9 +12,15 @@ class KeywordFilter
   #
   # @param mail [Mail::Message] mail to be redacted
   def apply!(mail)
-    mail.subject redact(mail.subject)
-    require 'pry'; binding.pry
-    mail.body    redact(mail.body)
+    mail.subject = redact(mail.subject)
+
+    if mail.multipart?
+      mail.parts.each do |part|
+        part.body = redact(part.body)
+      end
+    else
+      mail.body = redact(mail.body)
+    end
   end
 
   private

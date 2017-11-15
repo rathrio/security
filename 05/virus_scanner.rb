@@ -3,6 +3,8 @@ require 'clamav/client'
 class VirusScanner
   attr_reader :client
 
+  VIRUS_REMOVED = '[Virus removed]'
+
   def initialize
     @client = ClamAV::Client.new
   end
@@ -11,40 +13,46 @@ class VirusScanner
   #
   # @param mail [Mail::Message] mail to be filtered
   def apply!(mail)
-    if mail.multipart?
-      apply_multipart(mail)
-      return
+    viruses = []
+
+    mail.parts.each do |part|
+      next unless attachment?(part)
+
+      result = scan(part.body)
+
+      if virus?(result)
+        part.body = ["#{VIRUS_REMOVED}#{result.virus_name}"].pack("m")
+        viruses << result
+      end
     end
 
-    result = scan(mail.body.decoded)
-    if virus?(result)
-      mail.body = ''
-      add_notice(mail)
+    if viruses.any?
+      mail.subject = "#{VIRUS_REMOVED} #{mail.subject}"
+
+      notice = <<~EOS
+
+
+
+        -------------------------------------------------------------------------------
+
+        Detected and removed the following threats:
+
+        #{viruses.map { |v| "- #{v.virus_name}" }.join("\n\n")}
+      EOS
+
+      body_part = mail.parts.first
+      body_part.body = "#{body_part.body}\n\n#{notice}"
     end
   end
 
   private
 
-  def apply_multipart(mail)
-    virus_detected = false
-
-    mail.attachments.map do |a|
-      result = scan(a.decoded)
-      next unless virus?(result)
-      virus_detected = true
-    end
-
-    if virus_detected
-      add_notice(mail)
-    end
+  def attachment?(part)
+    part.content_disposition =~ /attachment/i
   end
 
   def virus?(result)
     result.kind_of? ClamAV::VirusResponse
-  end
-
-  def add_notice(mail)
-    mail.subject = "[Virus removed] #{mail.subject}"
   end
 
   def scan(str)
