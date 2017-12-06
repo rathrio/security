@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+
+require 'webrick'
+require 'webrick/httpproxy'
+
+if ARGV.empty?
+  puts "Usage: ./proxy blacklist.txt"
+  exit
+end
+
+$blacklist = File.readlines(ARGV.first).map(&:chomp)
+
+def handle_request(req, res)
+  domain = if req.request_uri
+             req.request_uri.host
+           else
+             req.unparsed_uri
+           end
+
+  forbidden = $blacklist.any? { |rgx| domain.match?(Regexp.new(rgx)) }
+
+  if forbidden
+    puts "- -> Content blocked for \"#{req.request_line}\""
+    res.body = ""
+    res.status = 451
+  end
+end
+
+proxy = WEBrick::HTTPProxyServer.new(
+  Port: 8080,
+  ProxyContentHandler: method(:handle_request)
+)
+
+
+trap 'INT'  do proxy.shutdown end
+trap 'TERM' do proxy.shutdown end
+
+proxy.start

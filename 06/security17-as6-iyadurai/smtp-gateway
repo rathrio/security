@@ -1,0 +1,102 @@
+#!/usr/bin/env ruby
+
+require 'gserver'
+require 'mini-smtp-server'
+require 'mail'
+require 'optparse'
+
+require_relative './keyword_filter'
+require_relative './virus_scanner'
+require_relative './dane'
+
+# CLI
+
+usage = <<EOS
+Usage: ./smtp-gateway [options] kw_file1 [kw_file2 ...]
+
+    Example
+        ./smtp-gateway filter.txt --host localhost:1234
+
+EOS
+
+$options = {}
+option_parser = OptionParser.new do |opts|
+  opts.banner = usage
+
+  opts.on('--host HOST:PORT') do |host|
+    $options[:host], $options[:port] = host.strip.split(':')
+  end
+
+  opts.on('--relay HOST:PORT') do |host|
+    $options[:relay_host], $options[:relay_port] = host.strip.split(':')
+  end
+
+  opts.on_tail('-h', '--help', 'Show this message') do
+    puts opts
+    exit
+  end
+end
+
+HELP = option_parser.help
+option_parser.parse!
+
+if ARGV.empty?
+  puts HELP
+  exit
+end
+
+# Load keywords from file args.
+KEYWORDS = ARGF.readlines.map(&:chomp).reject(&:empty?)
+
+GATEWAY_HOST = $options[:host] || 'localhost'
+GATEWAY_PORT = $options[:port] || 2525
+
+# mailcatcher SMTP server by default
+RELAY_HOST = $options[:relay_host] || 'mailtest.vaucher.org'
+RELAY_PORT = $options[:relay_port] || 25
+
+# # Let mail know about where to relay to.
+# Mail.defaults do
+#   delivery_method :smtp, address: RELAY_HOST, port: RELAY_PORT, enable_starttls_auto: true
+# end
+
+class SMTPGateway < MiniSmtpServer
+  def new_message_event(message_hash)
+    # Parse the received email.
+    mail = Mail.read_from_string(message_hash.fetch(:data))
+
+    # Remove viruses.
+    scanner = VirusScanner.new
+    scanner.apply!(mail)
+
+    # Redact keywords.
+    filter = KeywordFilter.new KEYWORDS
+    filter.apply!(mail)
+
+    dane = Dane.new
+    dane.apply!(mail)
+
+    mail.delivery_method :smtp, address: RELAY_HOST, port: RELAY_PORT,
+      enable_starttls_auto: true, enable_starttls: true
+
+    # Relay it.
+    mail.deliver
+    puts mail
+  end
+end
+
+server = SMTPGateway.new(GATEWAY_PORT, GATEWAY_HOST)
+server.start
+
+header = <<~EOS
+  SMTP Gateway 9000
+  =================
+
+  Listening: smtp://#{GATEWAY_HOST}:#{GATEWAY_PORT}
+  Relay: smtp://#{RELAY_HOST}:#{RELAY_PORT}
+  Keywords: #{KEYWORDS.count}
+
+EOS
+puts header
+
+server.join

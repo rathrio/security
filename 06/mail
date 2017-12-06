@@ -44,14 +44,10 @@ option_parser.parse!
 host = $options[:host] || 'localhost'
 port = $options[:port] || 2525
 
-Mail.defaults do
-  delivery_method :smtp, address: host, port: port
-end
-
 from    = $options[:from] || 'spongebob@bikini.org'
-to      = $options[:to] || 'patrick@star.com'
+to      = $options[:to] || 'foo@bar.com'
 subject = $options[:subject] || 'super secret stuff'
-body    = $options[:body] || 'hey patrick, you wanna hang out and do some super secret stuff and exchange secrets?'
+body    = $options[:body] || 'hey user, you wanna hang out and do some super secret stuff and exchange secrets?'
 
 mail = Mail.new do
   from    from
@@ -63,6 +59,10 @@ end
 ($options[:files] || []).each do |file|
   mail.add_file(file)
 end
+
+require 'pry'; binding.pry
+mail.delivery_method :smtp, address: host, port: port, tls: false,
+  enable_starttls_auto: false, enable_starttls: false
 
 mail.deliver
 puts mail

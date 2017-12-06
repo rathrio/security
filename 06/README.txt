@@ -1,4 +1,4 @@
-Assignment 5 - E-mail security (part 2)
+Assignment 6 - E-mail security (part 3)
 =======================================
 
 Rathesan Iyadurai (10-107-688)
@@ -12,8 +12,6 @@ You should find the following files in this directory:
 - keyword_filter.rb: filter that redacts keywords.
 - virus_scanner.rb: filter that neutralizes evil attachments.
 - filter.txt: Example keyword file.
-- not_a_virus.txt: File that contains the EICAR test string.
-- not_a_virus_for_real.txt: Virus free file.
 
 
 Prerequisites
@@ -30,19 +28,16 @@ Prerequisites
     web UI
   - https://rubygems.org/gems/clamav-client: for communicated with the ClamAV
     daemon
+  - https://rubygems.org/gems/dnsruby
 
   You can install them all with the RubyGems package manager:
 
-      gem install mail gserver mini-smtp-server mailcatcher clamav-client
+      gem install mail gserver mini-smtp-server mailcatcher clamav-client dnsruby
 
   I'm using a socket to communicate with the clamd server. You might need to
   set the following ENV var to let the client know about the correct socket:
 
       CLAMD_UNIX_SOCKET='/tmp/clamd.socket'
 
-
-Usage
------
-
-See README for Assignment 4. The only difference is that files with viruses are
-now being neutralized.
+NOTE: I gave up, because of configuration issues. Will attempt to get it
+working later.
