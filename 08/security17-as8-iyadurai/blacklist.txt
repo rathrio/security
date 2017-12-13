@@ -1,0 +1,5 @@
+ads\..+
+example
+.*porn.*
+detectportal
+pki\.goog
