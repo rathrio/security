@@ -25,7 +25,7 @@ def handle_request(req, res)
   forbidden = $blacklist.any? { |rgx| domain.match?(Regexp.new(rgx)) }
 
   if forbidden
-    puts "- -> Content blocked for \"#{req.request_line}\""
+    puts "==========> Content blocked for \"#{req.request_line}\""
     res.body = ""
     res.status = 451
   end
@@ -46,14 +46,15 @@ class WEBrick::HTTPProxyServer
     unavailable_file = "#{unavailable_dir}/#{cache_key}"
     cache_file = "#{cache_dir}/#{cache_key}"
 
+    # We know it's unavailable.
     if File.exists?(unavailable_file)
-      puts "Cache hit for unavailable Service #{cache_key_str}"
+      puts "==========> Cache hit for unavailable Service #{uri} #{cache_key_str}"
       raise WEBrick::HTTPStatus::ServiceUnavailable, "Service Unavailable"
     end
 
     # Try to load from cache...
     if File.exists?(cache_file)
-      puts "Cache hit for #{cache_key_str}"
+      puts "==========> Cache hit for #{uri} #{cache_key_str}"
       res_hash = Marshal.load(File.read(cache_file))
       res.body = res_hash[:body]
       res.status = res_hash[:status]
@@ -68,6 +69,7 @@ class WEBrick::HTTPProxyServer
       rescue => err
         logger.debug("#{err.class}: #{err.message}")
 
+        puts "==========> Caching unavailability to #{unavailable_file}"
         FileUtils.mkdir_p(unavailable_dir)
         File.open(unavailable_file, 'w') do |f|
           f.write "Nothing to see here."
@@ -77,22 +79,36 @@ class WEBrick::HTTPProxyServer
       end
 
       # ...and cache the response
-      puts "Writing response to #{cache_file}"
-      to_marshal = {
-        body: res.body,
-        status: res.status,
-        header: res.header
-      }
+      if may_cache?(req, res)
+        puts "==========> Caching response to #{cache_file}"
+        to_marshal = {
+          body: res.body,
+          status: res.status,
+          header: res.header
+        }
 
-      FileUtils.mkdir_p(cache_dir)
-      File.open(cache_file, 'w') do |f|
-        f.write Marshal.dump(to_marshal)
+        FileUtils.mkdir_p(cache_dir)
+        File.open(cache_file, 'w') do |f|
+          f.write Marshal.dump(to_marshal)
+        end
+      else
+        puts "==========> Caching prohibited by #{uri} #{cache_key_str}"
       end
     end
 
     # Postprocess contents, in our case, apply the content blocker.
     if handler = @config[:ProxyContentHandler]
       handler.call(req, res)
+    end
+  end
+
+  private
+
+  def may_cache?(req, res)
+    headers = [req.header, res.header]
+
+    headers.none? do |h|
+      h['cache-control'].to_s.match? /\b(private|no-cache)\b/
     end
   end
 end
