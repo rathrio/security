@@ -1,0 +1,10 @@
+{:	bodyI"ã<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>301 Moved Permanently</title>
+</head><body>
+<h1>Moved Permanently</h1>
+<p>The document has moved <a href="https://www.sbb.ch/">here</a>.</p>
+</body></html>
+:ET:statusi-:header{I"proxy-connection;TI"
+close;TI"connection;TI"
+close;TI"	date;TI""Wed, 13 Dec 2017 10:49:01 GMT;TI"server;TI"Apache;TI"location;TI"https://www.sbb.ch/;TI"content-length;TI"227;TI"content-type;TI""text/html; charset=iso-8859-1;TI"x-cache;TI"MISS from proxy.unibe.ch;TI"x-cache-lookup;TI"!HIT from proxy.unibe.ch:3128;TI"via;TI"F1.1 bori.unibe.ch (squid), 1.1 stud-234-200.eduroam.unibe.ch:8080;T

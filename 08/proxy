@@ -2,11 +2,16 @@
 
 require 'webrick'
 require 'webrick/httpproxy'
+require 'fileutils'
+
+CACHE_DIR = File.expand_path('../cache', __FILE__)
 
 if ARGV.empty?
   puts "Usage: ./proxy blacklist.txt"
   exit
 end
+
+FileUtils.mkdir_p CACHE_DIR
 
 $blacklist = File.readlines(ARGV.first).map(&:chomp)
 
@@ -26,35 +31,76 @@ def handle_request(req, res)
   end
 end
 
-class CachingProxy < WEBrick::HTTPProxyServer
+class WEBrick::HTTPProxyServer
   def proxy_service(req, res)
-    puts 'GOT A REQUEST'
-    require 'pry'; binding.pry
     # Proxy Authentication
     proxy_auth(req, res)
 
-    begin
-      self.send("do_#{req.request_method}", req, res)
-    rescue NoMethodError
-      raise HTTPStatus::MethodNotAllowed,
-        "unsupported method `#{req.request_method}'."
-    rescue => err
-      logger.debug("#{err.class}: #{err.message}")
-      raise HTTPStatus::ServiceUnavailable, err.message
+    uri = req.request_uri
+    path = uri.path.clone
+    path << "?#{uri.query}" if uri.query
+    cache_key_str = "#{req.request_method} #{path} #{req.body}"
+    cache_key = Digest::MD5.hexdigest(cache_key_str)
+    cache_dir = "#{CACHE_DIR}/#{uri.host}:#{uri.port}"
+    unavailable_dir = "#{CACHE_DIR}/unavailable/#{uri.host}:#{uri.port}/"
+    unavailable_file = "#{unavailable_dir}/#{cache_key}"
+    cache_file = "#{cache_dir}/#{cache_key}"
+
+    if File.exists?(unavailable_file)
+      puts "Cache hit for unavailable Service #{cache_key_str}"
+      raise WEBrick::HTTPStatus::ServiceUnavailable, "Service Unavailable"
     end
 
-    # Process contents
+    # Try to load from cache...
+    if File.exists?(cache_file)
+      puts "Cache hit for #{cache_key_str}"
+      res_hash = Marshal.load(File.read(cache_file))
+      res.body = res_hash[:body]
+      res.status = res_hash[:status]
+      res.instance_variable_set("@header", res_hash[:header])
+    else
+      # ...or do the actual request...
+      begin
+        self.send("do_#{req.request_method}", req, res)
+      rescue NoMethodError
+        raise WEBrick::HTTPStatus::MethodNotAllowed,
+          "unsupported method `#{req.request_method}'."
+      rescue => err
+        logger.debug("#{err.class}: #{err.message}")
+
+        FileUtils.mkdir_p(unavailable_dir)
+        File.open(unavailable_file, 'w') do |f|
+          f.write "Nothing to see here."
+        end
+
+        raise WEBrick::HTTPStatus::ServiceUnavailable, "Service Unavailable"
+      end
+
+      # ...and cache the response
+      puts "Writing response to #{cache_file}"
+      to_marshal = {
+        body: res.body,
+        status: res.status,
+        header: res.header
+      }
+
+      FileUtils.mkdir_p(cache_dir)
+      File.open(cache_file, 'w') do |f|
+        f.write Marshal.dump(to_marshal)
+      end
+    end
+
+    # Postprocess contents, in our case, apply the content blocker.
     if handler = @config[:ProxyContentHandler]
       handler.call(req, res)
     end
   end
 end
 
-proxy = CachingProxy.new(
+proxy = WEBrick::HTTPProxyServer.new(
   Port: 8080,
   ProxyContentHandler: method(:handle_request)
 )
-
 
 trap 'INT'  do proxy.shutdown end
 trap 'TERM' do proxy.shutdown end
